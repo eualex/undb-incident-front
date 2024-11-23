@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/presentation/components/ui/button';
+import axios from 'axios';
 import {
   Form,
   FormControl,
@@ -17,6 +18,13 @@ import { Input } from '@/presentation/components/ui/input';
 
 import logoImg from '@/public/images/logo.png';
 import loginBgImg from '@/public/images/login_bg.png';
+import { useRouter } from 'next/navigation';
+import { Paths } from '@/presentation/constants/paths';
+import { jwtDecode } from 'jwt-decode';
+import { useToast } from '@/presentation/hooks/use-toast';
+import { useState } from 'react';
+import { Loader } from 'lucide-react';
+import Cookies from 'js-cookie';
 
 const formSchema = z.object({
   email: z
@@ -32,6 +40,9 @@ const formSchema = z.object({
 });
 
 export default function Home() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -41,7 +52,33 @@ export default function Home() {
   });
 
   function handleSubmit(data: z.infer<typeof formSchema>) {
-    console.log(data);
+    setIsLoading(true);
+    axios
+      .post('http://192.168.88.53:9090/auth/login', {
+        email: data.email,
+        password: data.password,
+      })
+      .then(res => {
+        const response = res.data as { token: string };
+        const token = response?.token;
+        const data = jwtDecode<{ email: string; role: string }>(token);
+
+        Cookies.set('token', token);
+
+        if (data?.role === 'SUPER_ADMIN') {
+          router.push(Paths.TICKET);
+        } else {
+          router.push(Paths.NEW_TICKET);
+        }
+      })
+      .catch(() => {
+        toast({
+          variant: 'destructive',
+          title: 'Erro no login',
+          description: 'Não foi possivel realizar o login',
+        });
+      })
+      .finally(() => setIsLoading(false));
   }
 
   return (
@@ -97,8 +134,17 @@ export default function Home() {
                 )}
               />
 
-              <Button className="w-full mt-6" type="submit" variant="default">
-                Entrar
+              <Button
+                className="w-full mt-6"
+                type="submit"
+                variant="default"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader className="animate-spin" size={24} />
+                ) : (
+                  'Entrar'
+                )}
               </Button>
             </form>
           </Form>

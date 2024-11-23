@@ -35,6 +35,10 @@ import { CalendarIcon, UserPen, UsersRound } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import Cookies from 'js-cookie';
+import axios from 'axios';
+import { useToast } from '@/presentation/hooks/use-toast';
+import { useState } from 'react';
 
 function CardInfo({
   children,
@@ -110,11 +114,68 @@ const formSchema = z.object({
       })
       .min(1, 'Celular é obrigatório'),
 
-    requstedBy: z.enum(['scholl', 'parent'], {
+    requstedBy: z.enum(['ESCOLA', 'PAIS'], {
       required_error: 'Solicitado por é obrigatório',
     }),
   }),
 });
+
+interface MappedOutput {
+  nameParent: string;
+  emailParent: string;
+  cellParent: string;
+  phoneParent: string;
+  type: string;
+
+  nameStudent: string;
+  dateOfBirth?: string;
+  classNumber: number;
+  grade: number;
+
+  questions: string;
+  observationForSchool: string;
+  provisions: string;
+  finalObservations: string;
+  student: {
+    name: string;
+    matricula?: string;
+    classNumber: number;
+    grade: number;
+  };
+
+  status: string;
+}
+
+function mapDefaultValuesToOutput(
+  defaultValues: z.infer<typeof formSchema>,
+): MappedOutput {
+  return {
+    nameParent: defaultValues.guardians.name,
+    emailParent: defaultValues.guardians.email,
+    cellParent: defaultValues.guardians.cellPhone,
+    phoneParent: defaultValues.guardians.phone,
+    type: 'PAIS',
+
+    nameStudent: defaultValues.student.name,
+    dateOfBirth: defaultValues.student.birthday?.toISOString(),
+    classNumber: Number(defaultValues.student.studentClass),
+    grade: Number(defaultValues.student.yearOrSerie),
+
+    questions: defaultValues?.questions ?? '',
+    observationForSchool: defaultValues.observations ?? '',
+    provisions: defaultValues.provisions,
+    finalObservations: defaultValues.finalObservations ?? '',
+
+    student: {
+      name: defaultValues.student.name,
+      matricula: '20231234',
+      classNumber: Number(defaultValues.student.studentClass),
+      grade: Number(defaultValues.student.yearOrSerie),
+    },
+
+    status: 'SEM_RESPOSTA',
+  };
+}
 
 export default function NewTicket() {
   const searchParams = useSearchParams();
@@ -123,6 +184,8 @@ export default function NewTicket() {
   );
   const pathname = usePathname();
   const { push } = useRouter();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -134,6 +197,17 @@ export default function NewTicket() {
         yearOrSerie: '',
         serviceDate: undefined,
       },
+      guardians: {
+        cellPhone: '',
+        degreeOfKinship: '',
+        email: '',
+        name: '',
+        phone: '',
+      },
+      finalObservations: '',
+      observations: '',
+      provisions: '',
+      questions: '',
     },
   });
 
@@ -148,9 +222,54 @@ export default function NewTicket() {
     };
   }
 
-  function handleSubmit() {
-    //TODO: add integration
-    console.log('Submit');
+  function handleSubmit(data: z.infer<typeof formSchema>) {
+    const token = Cookies.get('token');
+    setIsLoading(true);
+    axios
+      .post(
+        'http://192.168.88.53:9090/called',
+        mapDefaultValuesToOutput(data),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then(() => {
+        toast({
+          variant: 'default',
+          title: 'Chamado criado com sucesso',
+          description: 'Seu chamado foi criado com sucesso',
+        });
+        form.reset({
+          student: {
+            name: '',
+            birthday: undefined,
+            studentClass: '',
+            yearOrSerie: '',
+            serviceDate: undefined,
+          },
+          guardians: {
+            cellPhone: '',
+            degreeOfKinship: '',
+            email: '',
+            name: '',
+            phone: '',
+          },
+          finalObservations: '',
+          observations: '',
+          provisions: '',
+          questions: '',
+        });
+      })
+      .catch(() => {
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao criar chamado',
+          description: 'Não foi possivel criar o chamado',
+        });
+      });
+    setIsLoading(false);
   }
 
   return (
@@ -158,7 +277,7 @@ export default function NewTicket() {
       <title>Chamados - Novo chamado</title>
       <QuardianBreadcrumb />
       <main className="w-full h-full flex items-center justify-center">
-        <div className="container my-16">
+        <div className="container mt-16 mb-28">
           <div className=" bg-white shadow-sm rounded-xl py-9 px-8 h-max">
             {step === RegisterTicketSteps.ON_BOARDING && (
               <div className="flex items-start gap-16">
@@ -423,7 +542,7 @@ export default function NewTicket() {
                         name="guardians.email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Ano/Série</FormLabel>
+                            <FormLabel>Email</FormLabel>
                             <FormControl>
                               <Input
                                 type="text"
@@ -486,7 +605,7 @@ export default function NewTicket() {
                               >
                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                   <FormControl>
-                                    <RadioGroupItem value="all" />
+                                    <RadioGroupItem value="ESCOLA" />
                                   </FormControl>
                                   <FormLabel className="font-normal">
                                     Pela Escola
@@ -494,7 +613,7 @@ export default function NewTicket() {
                                 </FormItem>
                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                   <FormControl>
-                                    <RadioGroupItem value="mentions" />
+                                    <RadioGroupItem value="PAIS" />
                                   </FormControl>
                                   <FormLabel className="font-normal">
                                     Pelos pais
@@ -643,7 +762,11 @@ export default function NewTicket() {
           </div>
         </div>
       </main>
-      <GuardianFooter handleStep={handleStep} formId="ticket__form" />
+      <GuardianFooter
+        handleStep={handleStep}
+        formId="ticket__form"
+        isLoading={isLoading}
+      />
     </>
   );
 }

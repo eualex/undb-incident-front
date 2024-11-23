@@ -20,16 +20,89 @@ import {
 } from '@/presentation/components/ui/table';
 import { Pill } from '@/presentation/components/base/pill';
 import { Button } from '@/presentation/components/ui/button';
+import Cookies from 'js-cookie';
+import { useQuery } from '@tanstack/react-query';
+
+interface Parent {
+  id: number;
+  name: string;
+  email: string;
+  cell: string;
+  phone: string;
+  type: string;
+}
+
+interface Student {
+  id: number;
+  name: string;
+  dateOfBirth: string;
+  classNumber: number;
+  grade: number;
+  parent: Parent;
+}
+
+interface ContentItem {
+  id: number;
+  questions: string;
+  observationForSchool: string;
+  provisions: string;
+  finalObservations: string;
+  dateOfAttendance: string;
+  student: Student;
+  user: string;
+  status: string;
+}
+
+interface Sort {
+  direction: string;
+  nullHandling: string;
+  ascending: boolean;
+  property: string;
+  ignoreCase: boolean;
+}
+
+interface Pageable {
+  offset: number;
+  sort: Sort[];
+  pageSize: number;
+  paged: boolean;
+  pageNumber: number;
+  unpaged: boolean;
+}
+
+interface Response {
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  content: ContentItem[];
+  number: number;
+  sort: Sort[];
+  first: boolean;
+  last: boolean;
+  numberOfElements: number;
+  pageable: Pageable;
+  empty: boolean;
+}
 
 export default function HistoryPage() {
-  const [page, setPage] = useQueryState('page', parseAsInteger.withDefault(1));
+  const [page] = useQueryState('page', parseAsInteger.withDefault(1));
+  const token = Cookies.get('token');
+  const { data } = useQuery<Response>({
+    queryKey: ['history', page],
+    queryFn: async () => {
+      const response = await fetch(
+        `http://192.168.88.53:9090/called/listMy?page=${page}&size=10`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      return response.json();
+    },
+  });
 
-  const rowsPerPage = 10;
-  const totalRows = 100;
-
-  const totalPages = Math.ceil(totalRows / rowsPerPage);
-
-  //TODO: add integration
+  const totalPages = data?.totalPages ?? 1;
 
   return (
     <>
@@ -48,7 +121,9 @@ export default function HistoryPage() {
             <div className="px-6 py-5 flex items-center justify-start gap-2">
               <p className="text-lg text-gray-900">Histórico de chamados</p>
               <span className="text-center px-2 h-[22px] rounded-2xl bg-gray-100 flex items-center justify-center">
-                <p className="text-xs text-primary">25 chamados</p>
+                <p className="text-xs text-primary">
+                  {data?.totalElements} chamados
+                </p>
               </span>
             </div>
 
@@ -65,19 +140,25 @@ export default function HistoryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">INV001</TableCell>
-                    <TableCell>Paid</TableCell>
-                    <TableCell>
-                      <Pill variant={'error'}>Resolvido</Pill>
-                    </TableCell>
-                    <TableCell className="">
-                      <Button variant="primary_outline">
-                        Ver Andamento
-                        <ArrowRight />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                  {data?.content?.map(item => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item?.id}</TableCell>
+                      <TableCell>
+                        {item.status === 'RESOLVIDO' ? (
+                          <Pill variant={'success'}>Resolvido</Pill>
+                        ) : (
+                          <Pill variant={'error'}>Sem resposta</Pill>
+                        )}
+                      </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="">
+                        <Button variant="primary_outline">
+                          Ver Andamento
+                          <ArrowRight />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>

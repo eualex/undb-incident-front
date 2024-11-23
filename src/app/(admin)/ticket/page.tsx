@@ -26,7 +26,7 @@ import logoWhiteImg from '@/public/images/logo_white.png';
 import logoImg from '@/public/images/logo.png';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/presentation/components/ui/button';
 import {
   Table,
@@ -47,6 +47,10 @@ import {
 import { Pill } from '@/presentation/components/base/pill';
 import { parseAsInteger, useQueryState } from 'next-usequerystate';
 import { Switch } from '@/presentation/components/ui/switch';
+import { Paths } from '@/presentation/constants/paths';
+import Cookies from 'js-cookie';
+import { useQuery } from '@tanstack/react-query';
+// import { useQuery } from '@tanstack/react-query';
 
 const items = [
   {
@@ -54,10 +58,21 @@ const items = [
     url: '/ticket',
     icon: Home,
   },
+  {
+    title: 'Novo Chamado',
+    url: '/new-ticket',
+    icon: Home,
+  },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  function handleLogout() {
+    Cookies.remove('token');
+    router.push(Paths.LOGIN);
+  }
 
   return (
     <Sidebar>
@@ -87,7 +102,11 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Button className="mt-auto mx-3 mb-4" variant="outline">
+        <Button
+          className="mt-auto mx-3 mb-4"
+          variant="outline"
+          onClick={handleLogout}
+        >
           Sair
           <LogOut size={24} />
         </Button>
@@ -97,7 +116,22 @@ export function AppSidebar() {
 }
 
 export default function Tickets() {
-  const [page, setPage] = useQueryState('page', parseAsInteger.withDefault(1));
+  const [page] = useQueryState('page', parseAsInteger.withDefault(1));
+  const token = Cookies.get('token');
+  const { data } = useQuery<Response>({
+    queryKey: ['history', page],
+    queryFn: async () => {
+      const response = await fetch(
+        `http://192.168.249.13:9090/called/listMy?page=${page}&size=10`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      return response.json();
+    },
+  });
 
   const rowsPerPage = 10;
   const totalRows = 100;

@@ -7,13 +7,16 @@ import Link from 'next/link';
 
 import logoWhiteImage from '@/public/images/logo_white.png';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
 
 export function GuardianHeader() {
   const pathname = usePathname();
+  const router = useRouter();
 
   function handleLogout() {
-    console.log('Logout');
+    Cookies.remove('token');
+    router.push(Paths.LOGIN);
   }
 
   return (

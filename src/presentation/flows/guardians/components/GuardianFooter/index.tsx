@@ -4,15 +4,17 @@ import {
   StepTypeEnum,
   TICKET_STEP_QUERY_KEY,
 } from '@/presentation/constants/ticket';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 export function GuardianFooter({
   handleStep,
   formId,
+  isLoading,
 }: {
   handleStep: (type: StepTypeEnum) => () => void;
   formId: string;
+  isLoading: boolean;
 }) {
   const searchParams = useSearchParams();
 
@@ -55,7 +57,13 @@ export function GuardianFooter({
 
               {step === RegisterTicketSteps.FINAL_CONSIDERATIONS && (
                 <Button type="submit" form={formId}>
-                  Enviar <ArrowRight name="local:arrow-right" size={24} />
+                  {isLoading ? (
+                    <Loader className="animate-spin" size={24} />
+                  ) : (
+                    <>
+                      Enviar <ArrowRight name="local:arrow-right" size={24} />
+                    </>
+                  )}
                 </Button>
               )}
             </>
